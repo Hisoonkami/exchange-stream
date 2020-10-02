@@ -1,9 +1,6 @@
 package com.adev.exchange.stream.exchange.bitbank;
 
-import com.adev.common.base.domian.Kline;
-import com.adev.common.base.domian.OrderBook;
-import com.adev.common.base.domian.Ticker;
-import com.adev.common.base.domian.Trade;
+import com.adev.common.base.domian.*;
 import com.adev.common.base.utils.DataUtils;
 import com.adev.common.exchange.StreamingMarketDataService;
 import com.adev.common.exchange.exception.NotYetImplementedForExchangeException;
@@ -123,26 +120,20 @@ public class BitbankStreamingMarketDataService implements StreamingMarketDataSer
 					Long timestamp=depthNode.get("timestamp").asLong();
 					orderBook.setTimestamp(timestamp);
 					if(asksNode != null && bidsNode != null){
-						List<List<BigDecimal>> bids=new ArrayList<>();
+						List<PriceAndVolume> bids=new ArrayList<>();
 						Iterator<JsonNode> bidIte = bidsNode.iterator();
 						while(bidIte.hasNext()){
 							ArrayNode itemArrayNode=(ArrayNode)bidIte.next();
-							List<BigDecimal> bidItem=new ArrayList<>();
-							for (JsonNode item:itemArrayNode){
-								bidItem.add(DataUtils.objToBigDecimal(item));
-							}
-							bids.add(bidItem);
+							PriceAndVolume priceAndVolume=new PriceAndVolume(DataUtils.objToBigDecimal(itemArrayNode.get(0)),DataUtils.objToBigDecimal(itemArrayNode.get(1)));
+							bids.add(priceAndVolume);
 						}
 						orderBook.setBids(bids);
 						Iterator<JsonNode> askIte = asksNode.iterator();
-						List<List<BigDecimal>> asks=new ArrayList<>();
+						List<PriceAndVolume> asks=new ArrayList<>();
 						while(askIte.hasNext()){
 							ArrayNode itemArrayNode=(ArrayNode)askIte.next();
-							List<BigDecimal> askItem=new ArrayList<>();
-							for (JsonNode item:itemArrayNode){
-								askItem.add(DataUtils.objToBigDecimal(item));
-							}
-							asks.add(askItem);
+							PriceAndVolume priceAndVolume=new PriceAndVolume(DataUtils.objToBigDecimal(itemArrayNode.get(0)),DataUtils.objToBigDecimal(itemArrayNode.get(1)));
+							asks.add(priceAndVolume);
 						}
 						orderBook.setAsks(asks);
 					}

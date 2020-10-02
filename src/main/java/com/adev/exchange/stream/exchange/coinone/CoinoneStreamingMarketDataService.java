@@ -1,17 +1,16 @@
 package com.adev.exchange.stream.exchange.coinone;
 
-import com.adev.common.base.domian.Kline;
-import com.adev.common.base.domian.OrderBook;
-import com.adev.common.base.domian.Ticker;
-import com.adev.common.base.domian.Trade;
+import com.adev.common.base.domian.*;
 import com.adev.common.base.utils.DataUtils;
 import com.adev.common.exchange.StreamingMarketDataService;
 import com.adev.common.exchange.exception.NotYetImplementedForExchangeException;
 import com.adev.common.exchange.http.domain.RequestParam;
 import com.adev.common.exchange.http.service.HttpStreamingService;
+import com.adev.common.exchange.utils.TradeTypeUtil;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.reactivex.Observable;
 
 import java.math.BigDecimal;
@@ -68,7 +67,31 @@ public class CoinoneStreamingMarketDataService implements StreamingMarketDataSer
 
     @Override
     public Observable<Trade> getTrades(String currencyPair, Object... args) {
-        return null;
+        String url="https://api.coinone.co.kr/trades/?currency="+currencyPair.split("-")[0]+"&period=hour";
+        RequestParam requestParam=new RequestParam();
+        requestParam.setUrl(url);
+        return httpStreamingService.pollingRestApi(requestParam).flatMapIterable(s->{
+            List<Trade> tradeList=new ArrayList<>();
+            JsonNode jsonNode = mapper.readTree(s);
+            String errorCode=jsonNode.findValue("errorCode").asText();
+            if("0".equalsIgnoreCase(errorCode)) {
+                ArrayNode transactionsNode=(ArrayNode)jsonNode.get("completeOrders");
+                if(null!=transactionsNode){
+                    for (JsonNode item:transactionsNode){
+                        Trade trade=new Trade();
+                        trade.setExchange("coinone");
+                        trade.setCurrencyPair(currencyPair);
+                        trade.setPrice(DataUtils.objToBigDecimal(item.get("price")));
+                        trade.setOriginalAmount(DataUtils.objToBigDecimal(item.get("qty")));
+                        trade.setTradeType(TradeTypeUtil.getOrderType(item.get("is_ask").asText().toLowerCase()));
+                        trade.setTimestamp(DataUtils.objToLong(item.get("timestamp")));
+                        trade.setTradeId(DataUtils.objToLong(item.get("id")));
+                        tradeList.add(trade);
+                    }
+                }
+            }
+            return tradeList;
+        });
     }
 
     @Override
@@ -83,6 +106,43 @@ public class CoinoneStreamingMarketDataService implements StreamingMarketDataSer
 
     @Override
     public Observable<OrderBook> getOrderBook(String currencyPair, Object... args) {
-        throw new NotYetImplementedForExchangeException();
+        String url="https://api.coinone.co.kr/orderbook/?currency="+currencyPair.split("-")[0];
+        RequestParam requestParam=new RequestParam();
+        requestParam.setUrl(url);
+        return httpStreamingService.pollingRestApi(requestParam).map(s->{
+            OrderBook orderBook=new OrderBook();
+            orderBook.setExchange("coinone");
+            orderBook.setCurrencyPair(currencyPair);
+            JsonNode jsonNode = mapper.readTree(s);
+            String errorCode=jsonNode.findValue("errorCode").asText();
+            if("0".equalsIgnoreCase(errorCode)) {
+                orderBook.setTimestamp(DataUtils.objToLong(jsonNode.get("timestamp")));
+                ArrayNode bidsArray=(ArrayNode)jsonNode.get("bid");
+                if(null!=bidsArray){
+                    List<PriceAndVolume> bids=new ArrayList<>();
+                    for (JsonNode bidItemNode:bidsArray){
+                        PriceAndVolume priceAndVolume=new PriceAndVolume(DataUtils.objToBigDecimal(bidItemNode.get("price")),DataUtils.objToBigDecimal(bidItemNode.get("qty")));
+                        bids.add(priceAndVolume);
+                    }
+                    if(bids.size()>20){
+                        bids=bids.subList(0,20);
+                    }
+                    orderBook.setBids(bids);
+                }
+                ArrayNode asksArray=(ArrayNode)jsonNode.get("ask");
+                if(null!=asksArray){
+                    List<PriceAndVolume> asks=new ArrayList<>();
+                    for (JsonNode askItemNode:asksArray){
+                        PriceAndVolume priceAndVolume=new PriceAndVolume(DataUtils.objToBigDecimal(askItemNode.get("price")),DataUtils.objToBigDecimal(askItemNode.get("qty")));
+                        asks.add(priceAndVolume);
+                    }
+                    if(asks.size()>20){
+                        asks=asks.subList(0,20);
+                    }
+                    orderBook.setAsks(asks);
+                }
+            }
+            return orderBook;
+        });
     }
 }
