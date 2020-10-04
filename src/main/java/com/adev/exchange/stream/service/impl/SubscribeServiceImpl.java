@@ -93,7 +93,7 @@ public class SubscribeServiceImpl implements SubscribeService {
             }
         }
     }
-
+//sss 这里是发送的核心代码
     private void sendTickerToMq(Ticker ticker){
         String channel="/topic/tickers/"+ticker.getExchange()+"/"+ticker.getCurrencyPair();
         Map<String,Object> messageMap=new HashMap<>();
@@ -103,7 +103,7 @@ public class SubscribeServiceImpl implements SubscribeService {
         System.out.println(ticker);
         rabbitTemplate.convertAndSend("exchange","topic.ticker",JSON.toJSONString(messageMap));
     }
-
+//sss 这是我都放大看
     private List<String> findPairByExchange(String exchange){
         ResponseEntity<BaseResult> resultResponseEntity= gatherFeignClient.findCurrencyPairByExchange(exchange);
         if(null!=resultResponseEntity){
